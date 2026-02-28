@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  USER
+}
+
+enum DocumentType {
+  TEXT
+  FILE
+}
+
+enum DocumentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum TaskPlatform {
+  JIRA
+  TRELLO
+  PLANE
+}
+
+enum TaskStatus {
+  PENDING
+  CREATED
+  FAILED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         Role      @default(USER)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  documents    Document[]
+  tasks        Task[]
+  apiKeys      ApiKey[]
+  mcpConfigs   McpConfig[]
+  prompts      PromptTemplate[]
+}
+
+model Document {
+  id        String         @id @default(cuid())
+  userId    String
+  title     String
+  content   String
+  type      DocumentType
+  status    DocumentStatus @default(PENDING)
+  result    Json?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+}
+
+model Task {
+  id         String       @id @default(cuid())
+  documentId String
+  userId     String
+  externalId String?
+  platform   TaskPlatform
+  status     TaskStatus  @default(PENDING)
+  result     Json?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  document   Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ApiKey {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  encryptedKey String
+  provider     String
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+}
+
+model McpConfig {
+  id        String   @id @default(cuid())
+  userId    String
+  platform  String
+  envVars   Json
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform])
+}
+
+model PromptTemplate {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  content   String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+}

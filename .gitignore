@@ -1,0 +1,45 @@
+# ── Environment ──────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Node / web ────────────────────────────────────────────────────────────────
+web/node_modules/
+web/.next/
+web/out/
+web/.turbo/
+web/uploads/*
+!web/uploads/.gitkeep
+
+# ── Python / scripts ─────────────────────────────────────────────────────────
+scripts/.venv/
+scripts/__pycache__/
+scripts/*.pyc
+scripts/*.pyo
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# ── Database ──────────────────────────────────────────────────────────────────
+*.sqlite
+*.db
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Editors ───────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+scripts
