@@ -2,7 +2,7 @@
 
 **Convert documents into actionable tasks using AI and MCP.**
 
-Upload a document (PDF, DOCX, TXT or plain text), process it with any OpenAI-compatible model, and automatically create structured issues in your project management tool of choice (Plane, Jira, Trello) via [Model Context Protocol](https://modelcontextprotocol.io) servers.
+Upload a document (PDF, DOCX, TXT or plain text), process it with any OpenAI-compatible model, and automatically create structured issues in your project management tool of choice (supported Plane or Jira) via [Model Context Protocol](https://modelcontextprotocol.io) servers.
 
 ## Monorepo Structure
 
@@ -42,7 +42,7 @@ fastapi dev doc2md.py
 
 - **Document ingestion** — TXT, PDF, DOCX up to 10 MB (web) or inline text (scripts)
 - **Agentic AI processing** — Multi-turn tool-calling loop with any OpenAI-compatible model
-- **MCP integration** — Creates issues in Plane, Jira, or Trello via stdio MCP servers (`uvx`)
+- **MCP integration** — Creates issues in Plane or Jira via stdio MCP servers (`uvx`)
 - **Prompt templates** — Customisable system prompts (web UI) or inline (scripts)
 - **Encrypted API key vault** — AES-256-GCM storage (web)
 - **Role-based access** — ADMIN / MANAGER / USER (web)
@@ -53,7 +53,6 @@ fastapi dev doc2md.py
 |---|---|---|
 | Plane | `plane-mcp-server` | `PLANE_API_KEY`, `PLANE_WORKSPACE_SLUG`, `PLANE_BASE_URL` |
 | Jira | `atlassian-mcp-server` | `JIRA_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY` |
-| Trello | `mcp-server-trello` | `TRELLO_API_KEY`, `TRELLO_TOKEN`, `TRELLO_BOARD_ID` |
 
 ## Prerequisites
 

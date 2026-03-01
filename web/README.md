@@ -2,13 +2,13 @@
 
 **Admin-first application that converts documents into actionable tasks using AI and creates them in project management tools via MCP (Model Context Protocol).**
 
-Upload documents (text, PDF, DOCX), process them with an AI model (OpenAI-compatible), and automatically create issues in **Plane**, **Jira**, or **Trello**.
+Upload documents (text, PDF, DOCX), process them with an AI model (OpenAI-compatible), and automatically create issues in **Plane** or **Jira**.
 
 ## Features
 
 - **Document Management** — Upload and manage documents (text input or file upload: TXT, PDF, DOCX up to 10 MB)
 - **AI Processing** — Analyze documents with any OpenAI-compatible model (OpenAI, DeepSeek, Ollama, etc.) and generate structured task breakdowns
-- **MCP Integration** — Create issues directly in Plane, Jira, or Trello via Model Context Protocol servers (JSON-RPC over stdio with `uvx`)
+- **MCP Integration** — Create issues directly in Plane or Jira via Model Context Protocol servers (JSON-RPC over stdio with `uvx`)
 - **Prompt Templates** — Configurable system prompts for AI processing with a default template optimized for technical backlogs
 - **API Key Vault** — Encrypted storage for AI provider keys (AES-256-GCM with scrypt key derivation)
 - **User Management** — Admin-first model: first registered user becomes ADMIN, subsequent users created by admins only
@@ -103,7 +103,7 @@ src/
 ## Usage Workflow
 
 1. **Configure AI** — Go to Settings → API Keys and add your OpenAI or compatible API key
-2. **Configure MCP** (optional) — Go to Settings → MCP Integrations and set up Plane/Jira/Trello with required environment variables
+2. **Configure MCP** (optional) — Go to Settings → MCP Integrations and set up Plane/Jira with required environment variables
 3. **Set Prompt** — Go to Settings → Prompts to customize the AI system prompt (a default is created on registration)
 4. **Upload Document** — Go to Documents and create a new document via text input or file upload
 5. **Process** — Open a document, select the target platform, and click "Process & Create Tasks"
@@ -116,7 +116,6 @@ Each platform requires specific environment variables:
 | Platform | MCP Server Package | Required Vars |
 |----------|-------------------|---------------|
 | **Jira** | `atlassian-mcp-server` | `JIRA_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY` |
-| **Trello** | `mcp-server-trello` | `TRELLO_API_KEY`, `TRELLO_TOKEN`, `TRELLO_BOARD_ID` |
 | **Plane** | `plane-mcp-server` | `PLANE_API_URL`, `PLANE_API_TOKEN`, `PLANE_WORKSPACE_SLUG`, `PLANE_PROJECT_ID` |
 
 ## Scripts
