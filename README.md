@@ -9,7 +9,7 @@ Upload a document (PDF, DOCX, TXT or plain text), process it with any OpenAI-com
 ```
 doc2task/
 ├── web/        # Next.js 16 full-stack web application
-└── scripts/    # Standalone Python agent (prototype / CLI)
+└── services/    # Microservices to make the job easier and cheaper.
 ```
 
 ## Packages
@@ -31,20 +31,11 @@ npx prisma migrate dev
 npm run dev
 ```
 
-### `scripts/` — Standalone Python Agent
-
-A self-contained Python script that connects directly to an MCP server and runs the same agentic loop without a UI.
-
-**Stack:** Python 3.10+ · OpenAI SDK · MCP Python SDK · uvx
-
-→ See [scripts/README.md](scripts/README.md) for setup instructions.
-
-**Quick start:**
+To upload files you must run the service
 ```bash
-cd scripts
-python -m venv .venv && source .venv/bin/activate
+cd services
 pip install -r requirements.txt
-python main.py
+fastapi dev doc2md.py
 ```
 
 ## Features
