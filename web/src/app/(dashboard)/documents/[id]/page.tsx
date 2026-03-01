@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Loader2, Zap, FileText } from 'lucide-react';
+import { ArrowLeft, Loader2, Zap, FileText, Pencil, Trash2, X, Save } from 'lucide-react';
 
 interface Document {
   id: string;
@@ -25,7 +28,16 @@ interface Task {
   createdAt: string;
 }
 
+interface ApiKey {
+  id: string;
+  name: string;
+  provider: string;
+}
+
+const PRIVILEGED_ROLES = ['ADMIN', 'MANAGER'];
+
 export default function DocumentDetailPage() {
+  const { data: session } = useSession();
   const params = useParams();
   const router = useRouter();
   const [document, setDocument] = useState<Document | null>(null);
@@ -33,12 +45,41 @@ export default function DocumentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [platform, setPlatform] = useState('PLANE');
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [selectedApiKeyId, setSelectedApiKeyId] = useState('');
+
+  // Edit state
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Delete state
+  const [deleting, setDeleting] = useState(false);
+
+  const isPrivileged = PRIVILEGED_ROLES.includes(session?.user?.role ?? '');
 
   useEffect(() => {
     if (params.id) {
       fetchDocument();
+      fetchApiKeys();
     }
   }, [params.id]);
+
+  const fetchApiKeys = async () => {
+    try {
+      const res = await fetch('/api/settings/api-keys');
+      if (res.ok) {
+        const data = await res.json();
+        setApiKeys(data);
+        if (data.length > 0) {
+          setSelectedApiKeyId(data[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching API keys:', error);
+    }
+  };
 
   const fetchDocument = async () => {
     try {
@@ -56,12 +97,17 @@ export default function DocumentDetailPage() {
   };
 
   const processDocument = async () => {
+    if (!selectedApiKeyId) {
+      alert('Please select an API key before processing.');
+      return;
+    }
+
     setProcessing(true);
     try {
       const res = await fetch(`/api/documents/${params.id}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform }),
+        body: JSON.stringify({ platform, apiKeyId: selectedApiKeyId }),
       });
 
       const data = await res.json();
@@ -77,6 +123,69 @@ export default function DocumentDetailPage() {
       alert('Failed to process document');
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const startEditing = () => {
+    if (!document) return;
+    setEditTitle(document.title);
+    setEditContent(document.content);
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setEditing(false);
+    setEditTitle('');
+    setEditContent('');
+  };
+
+  const handleSave = async () => {
+    if (!document) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/documents/${document.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: editTitle, content: editContent }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Failed to update document');
+        return;
+      }
+
+      const updated = await res.json();
+      setDocument(updated);
+      setEditing(false);
+    } catch (error) {
+      console.error('Error updating document:', error);
+      alert('Failed to update document');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!document) return;
+    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/documents/${document.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete document');
+        return;
+      }
+      router.push('/documents');
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      alert('Failed to delete document');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -102,15 +211,29 @@ export default function DocumentDetailPage() {
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-8">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/documents')}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">{document.title}</h1>
-          <p className="text-text-secondary mt-1">Type: {document.type}</p>
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => router.push('/documents')}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-text-primary">{document.title}</h1>
+            <p className="text-text-secondary mt-1">Type: {document.type}</p>
+          </div>
         </div>
+        {isPrivileged && !editing && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={startEditing}>
+              <Pencil className="w-4 h-4 mr-2" />
+              Edit
+            </Button>
+            <Button variant="danger" size="sm" onClick={handleDelete} loading={deleting}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -123,11 +246,41 @@ export default function DocumentDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
-                <pre className="whitespace-pre-wrap text-sm text-text-secondary font-mono">
-                  {document.content}
-                </pre>
-              </div>
+              {editing ? (
+                <div className="space-y-4">
+                  <Input
+                    label="Title"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    placeholder="Document title"
+                    required
+                  />
+                  <Textarea
+                    label="Content"
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    placeholder="Document content..."
+                    rows={16}
+                    required
+                  />
+                  <div className="flex gap-3 justify-end">
+                    <Button variant="outline" size="sm" onClick={cancelEditing} disabled={saving}>
+                      <X className="w-4 h-4 mr-2" />
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={handleSave} loading={saving}>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Changes
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                  <pre className="whitespace-pre-wrap text-sm text-text-secondary font-mono">
+                    {document.content}
+                  </pre>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -153,11 +306,37 @@ export default function DocumentDetailPage() {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-1.5">
+                  API Key
+                </label>
+                {apiKeys.length === 0 ? (
+                  <p className="text-sm text-text-secondary">
+                    No API keys configured.{' '}
+                    <a href="/settings/api-keys" className="text-primary hover:underline">
+                      Add one in Settings
+                    </a>
+                  </p>
+                ) : (
+                  <select
+                    value={selectedApiKeyId}
+                    onChange={(e) => setSelectedApiKeyId(e.target.value)}
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-white text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    {apiKeys.map((key) => (
+                      <option key={key.id} value={key.id}>
+                        {key.name} ({key.provider})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
               <Button
                 className="w-full"
                 onClick={processDocument}
                 loading={processing}
-                disabled={document.status === 'PROCESSING'}
+                disabled={document.status === 'PROCESSING' || apiKeys.length === 0}
               >
                 <Zap className="w-4 h-4 mr-2" />
                 Process & Create Tasks

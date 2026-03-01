@@ -1,4 +1,5 @@
 import { spawn, ChildProcess } from 'child_process';
+import { MCP_SERVERS } from './servers';
 
 export interface McpServerConfig {
   platform: string;
@@ -37,8 +38,11 @@ class McpClient {
       envVars[key] = config.envVars[key];
     }
 
+    const platformConfig = MCP_SERVERS[config.platform];
+    const args = platformConfig?.getArgs ? platformConfig.getArgs(config.envVars) : ['stdio'];
+
     return new Promise((resolve, reject) => {
-      this.process = spawn('uvx', [config.package, 'stdio'], {
+      this.process = spawn('uvx', [config.package, ...args], {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         env: envVars as any,
         stdio: ['pipe', 'pipe', 'pipe'],
