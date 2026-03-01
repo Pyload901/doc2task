@@ -24,7 +24,11 @@ export async function POST(
 
     const { id } = await params;
     const body = await request.json();
-    const { platform } = body;
+    const { platform, apiKeyId } = body;
+
+    if (!apiKeyId) {
+      return NextResponse.json({ error: 'API key selection is required' }, { status: 400 });
+    }
 
     const document = await prisma.document.findFirst({
       where: { id, userId: session.user.id },
@@ -39,54 +43,50 @@ export async function POST(
       data: { status: 'PROCESSING' },
     });
 
-    const apiKeys = await prisma.apiKey.findMany({
-      where: { userId: session.user.id },
+    const selectedKey = await prisma.apiKey.findFirst({
+      where: { id: apiKeyId, userId: session.user.id },
     });
 
-    const customModelKey = apiKeys.find(k => k.provider === 'CUSTOM_MODEL');
-    const openAiKey = apiKeys.find(k => k.provider === 'OPENAI');
-
-    let apiKeyData: { apiKey: string; baseUrl: string; model: string } | null = null;
-    let usedProvider = '';
-
-    if (customModelKey) {
-      try {
-        const config = JSON.parse(decrypt(customModelKey.encryptedKey));
-        apiKeyData = {
-          apiKey: config.apiKey || decrypt(customModelKey.encryptedKey),
-          baseUrl: config.baseUrl || 'https://api.deepseek.com',
-          model: config.model || 'deepseek-chat'
-        };
-        usedProvider = 'CUSTOM_MODEL';
-      } catch {
-        apiKeyData = {
-          apiKey: decrypt(customModelKey.encryptedKey),
-          baseUrl: 'https://api.deepseek.com',
-          model: 'deepseek-chat'
-        };
-        usedProvider = 'CUSTOM_MODEL';
-      }
-    } else if (openAiKey) {
-      apiKeyData = {
-        apiKey: decrypt(openAiKey.encryptedKey),
-        baseUrl: 'https://api.openai.com',
-        model: 'gpt-4o'
-      };
-      usedProvider = 'OPENAI';
-    }
-
-    if (!apiKeyData) {
+    if (!selectedKey) {
       await prisma.document.update({
         where: { id },
         data: { status: 'FAILED' },
       });
-      return NextResponse.json(
-        { error: 'No AI API key configured. Please add an API key in Settings > API Keys.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Selected API key not found' }, { status: 404 });
     }
 
-    console.log(`Using AI provider: ${usedProvider}`);
+    let apiKeyData: { apiKey: string; baseUrl: string; model: string } | null = null;
+
+    if (selectedKey.provider === 'CUSTOM_MODEL') {
+      try {
+        const config = JSON.parse(decrypt(selectedKey.encryptedKey));
+        apiKeyData = {
+          apiKey: config.apiKey || decrypt(selectedKey.encryptedKey),
+          baseUrl: config.baseUrl || 'https://api.deepseek.com',
+          model: config.model || 'deepseek-chat'
+        };
+      } catch {
+        apiKeyData = {
+          apiKey: decrypt(selectedKey.encryptedKey),
+          baseUrl: 'https://api.deepseek.com',
+          model: 'deepseek-chat'
+        };
+      }
+    } else if (selectedKey.provider === 'OPENAI') {
+      apiKeyData = {
+        apiKey: decrypt(selectedKey.encryptedKey),
+        baseUrl: 'https://api.openai.com',
+        model: 'gpt-4o'
+      };
+    } else {
+      apiKeyData = {
+        apiKey: decrypt(selectedKey.encryptedKey),
+        baseUrl: 'https://api.openai.com',
+        model: 'gpt-4o'
+      };
+    }
+
+    console.log(`Using AI provider: ${selectedKey.provider} (key: ${selectedKey.name})`);
 
     const promptTemplate = await prisma.promptTemplate.findFirst({
       where: { userId: session.user.id, isDefault: true },
@@ -162,6 +162,8 @@ export async function POST(
           });
           return NextResponse.json({ error: aiCall.error }, { status: 500 });
         }
+        
+        // console.log('AI call result:', aiCall.result);
 
         // Build the assistant message; only include tool_calls when present to avoid API errors
         const new_msg: ChatCompletionMessageParam = {
@@ -182,12 +184,56 @@ export async function POST(
         for (const toolCall of aiCall.result.tool_calls) {
           // Narrow to standard function tool calls (ignores custom tool call variants)
           if (toolCall.type !== 'function') continue;
+          
+          let parsedArgs: any = {};
+          try {
+            parsedArgs = JSON.parse(toolCall.function.arguments);
+          } catch (e) {
+            console.error('Failed to parse args for tool:', toolCall.function.name);
+          }
+
+          const task = await prisma.task.create({
+            data: {
+              documentId: id,
+              userId: session.user.id,
+              platform: platform as TaskPlatform,
+              status: 'PENDING',
+              result: {
+                action: toolCall.function.name,
+                payload: parsedArgs,
+              } as Prisma.JsonObject,
+            },
+          });
+
           // toolCall is ChatCompletionMessageToolCall: { id, type, function: { name, arguments } }
           // .function.arguments is a JSON string, so it must be parsed before passing to callTool
           const toolResult = await client.callTool(
             toolCall.function.name,
-            JSON.parse(toolCall.function.arguments)
+            parsedArgs
           );
+
+          let externalId: string | undefined = undefined;
+          if (toolResult.success && typeof toolResult.result === 'string') {
+            // Attempt to extract issue ID like "PROJ-123" from result text for Jira/similar
+            const match = toolResult.result.match(/[A-Z][A-Z0-9]+-\d+/);
+            if (match) {
+              externalId = match[0];
+            }
+          }
+
+          await prisma.task.update({
+            where: { id: task.id },
+            data: {
+              status: toolResult.success ? 'CREATED' : 'FAILED',
+              externalId: externalId,
+              result: {
+                action: toolCall.function.name,
+                payload: parsedArgs,
+                response: toolResult.result || toolResult.error || 'No content provided by server',
+              } as Prisma.JsonObject,
+            },
+          });
+
           messages.push({
             role: 'tool',
             tool_call_id: toolCall.id,   // required by ChatCompletionToolMessageParam
