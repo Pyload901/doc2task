@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { v4 as uuid } from 'uuid';
+import { doc2md } from '@/lib/doc2md';
 
 export async function GET() {
   try {
@@ -53,19 +54,29 @@ export async function POST(request: NextRequest) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        if (buffer.length > 10 * 1024 * 1024) {
-          return NextResponse.json({ error: 'File too large. Max 10MB' }, { status: 400 });
+        // Call the doc2md service
+        const markdownResult = await doc2md(buffer);
+        if (markdownResult.success) {
+          content = markdownResult.markdown || '';
+        } else {
+          return NextResponse.json({ error: 'Failed to convert document to markdown. Probably service not running' }, { status: 500 });
         }
+        
+        // console.log('Markdown content:', content);
+        
+        // if (buffer.length > 10 * 1024 * 1024) {
+        //   return NextResponse.json({ error: 'File too large. Max 10MB' }, { status: 400 });
+        // }
 
-        const uploadDir = path.join(process.cwd(), 'uploads');
-        await mkdir(uploadDir, { recursive: true });
+        // const uploadDir = path.join(process.cwd(), 'uploads');
+        // await mkdir(uploadDir, { recursive: true });
 
-        const ext = path.extname(file.name);
-        const filename = `${uuid()}${ext}`;
-        const filepath = path.join(uploadDir, filename);
+        // const ext = path.extname(file.name);
+        // const filename = `${uuid()}${ext}`;
+        // const filepath = path.join(uploadDir, filename);
 
-        await writeFile(filepath, buffer);
-        content = `/uploads/${filename}`;
+        // await writeFile(filepath, buffer);
+        // content = `/uploads/${filename}`;
       }
 
       const document = await prisma.document.create({
@@ -73,7 +84,7 @@ export async function POST(request: NextRequest) {
           userId: session.user.id,
           title,
           content,
-          type: file ? 'FILE' : 'TEXT',
+          type: 'TEXT',
           status: 'PENDING',
         },
       });
