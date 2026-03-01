@@ -28,6 +28,12 @@ interface Task {
   createdAt: string;
 }
 
+interface ApiKey {
+  id: string;
+  name: string;
+  provider: string;
+}
+
 const PRIVILEGED_ROLES = ['ADMIN', 'MANAGER'];
 
 export default function DocumentDetailPage() {
@@ -39,6 +45,8 @@ export default function DocumentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [platform, setPlatform] = useState('PLANE');
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [selectedApiKeyId, setSelectedApiKeyId] = useState('');
 
   // Edit state
   const [editing, setEditing] = useState(false);
@@ -54,8 +62,24 @@ export default function DocumentDetailPage() {
   useEffect(() => {
     if (params.id) {
       fetchDocument();
+      fetchApiKeys();
     }
   }, [params.id]);
+
+  const fetchApiKeys = async () => {
+    try {
+      const res = await fetch('/api/settings/api-keys');
+      if (res.ok) {
+        const data = await res.json();
+        setApiKeys(data);
+        if (data.length > 0) {
+          setSelectedApiKeyId(data[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching API keys:', error);
+    }
+  };
 
   const fetchDocument = async () => {
     try {
@@ -73,12 +97,17 @@ export default function DocumentDetailPage() {
   };
 
   const processDocument = async () => {
+    if (!selectedApiKeyId) {
+      alert('Please select an API key before processing.');
+      return;
+    }
+
     setProcessing(true);
     try {
       const res = await fetch(`/api/documents/${params.id}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform }),
+        body: JSON.stringify({ platform, apiKeyId: selectedApiKeyId }),
       });
 
       const data = await res.json();
@@ -277,11 +306,37 @@ export default function DocumentDetailPage() {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-1.5">
+                  API Key
+                </label>
+                {apiKeys.length === 0 ? (
+                  <p className="text-sm text-text-secondary">
+                    No API keys configured.{' '}
+                    <a href="/settings/api-keys" className="text-primary hover:underline">
+                      Add one in Settings
+                    </a>
+                  </p>
+                ) : (
+                  <select
+                    value={selectedApiKeyId}
+                    onChange={(e) => setSelectedApiKeyId(e.target.value)}
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-white text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    {apiKeys.map((key) => (
+                      <option key={key.id} value={key.id}>
+                        {key.name} ({key.provider})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
               <Button
                 className="w-full"
                 onClick={processDocument}
                 loading={processing}
-                disabled={document.status === 'PROCESSING'}
+                disabled={document.status === 'PROCESSING' || apiKeys.length === 0}
               >
                 <Zap className="w-4 h-4 mr-2" />
                 Process & Create Tasks
