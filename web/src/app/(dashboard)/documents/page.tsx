@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, Plus, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { FileText, Plus, Clock, CheckCircle, XCircle, Loader2, Trash2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
 interface Document {
@@ -16,7 +17,10 @@ interface Document {
   createdAt: string;
 }
 
+const PRIVILEGED_ROLES = ['ADMIN', 'MANAGER'];
+
 export default function DocumentsPage() {
+  const { data: session } = useSession();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -25,6 +29,9 @@ export default function DocumentsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [contentType, setContentType] = useState<'text' | 'file'>('text');
   const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const isPrivileged = PRIVILEGED_ROLES.includes(session?.user?.role ?? '');
 
   useEffect(() => {
     fetchDocuments();
@@ -99,6 +106,28 @@ export default function DocumentsPage() {
         return <Loader2 className="w-4 h-4 text-warning animate-spin" />;
       default:
         return <Clock className="w-4 h-4 text-text-secondary" />;
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete document');
+        return;
+      }
+      setDocuments((prev) => prev.filter((doc) => doc.id !== id));
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      alert('Failed to delete document');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -225,6 +254,17 @@ export default function DocumentsPage() {
                     <Button variant="outline" size="sm" onClick={() => window.location.href = `/documents/${doc.id}`}>
                       View
                     </Button>
+                    {isPrivileged && (
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => handleDelete(doc.id)}
+                        disabled={deletingId === doc.id}
+                        loading={deletingId === doc.id}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
