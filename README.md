@@ -4,6 +4,12 @@
 
 Upload a document (PDF, DOCX, TXT or plain text), process it with any OpenAI-compatible model, and automatically create structured issues in your project management tool of choice (supported Plane or Jira) via [Model Context Protocol](https://modelcontextprotocol.io) servers.
 
+# ☕ Support the project
+
+If this tool helped you automate your backlog, consider buying me a coffee!
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/daviddiaz6s)
+
 ## Monorepo Structure
 
 ```
